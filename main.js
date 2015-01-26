@@ -1,19 +1,26 @@
 // Axeda test..........
-var myModel                     = "MN7";
-var mySn                        = 900425000022;
+//var myModel                     = "MN7";
+//var mySn                        = 900425000022;
+var myModel                     = "MN47";
+var mySn                        = 916450000005;
 var myPlatformUrl               = "https://nextivity-sandbox-connect.axeda.com:443/ammp/";
 
 
 var MainLoopIntervalHandle      = null;
 var uMainLoopCounter            = 0;
-var uMainLoopCounterMax         = 5;
+var uMainLoopCounterMax         = 30;
 
 
 
 var loopState                   = null;
 
 const   STATE_GET_USER_INFO     = 0;
-const   STATE_DONE              = 1;
+const   STATE_GET_SKU           = 1;
+const   STATE_GET_REG_INFO      = 2;
+const   STATE_GET_UPDATE_FALSE  = 3;
+const   STATE_GET_UPDATE_TRUE   = 4;
+
+const   STATE_DONE              = 10;
 
 
 
@@ -33,6 +40,8 @@ var bGotUserInfoRspFromCloud    = false;
 var getUserInfoActionFromCloud  = null;
 
 
+// Reg info..................................
+var bGotRegInfoRspFromCloud     = false;
 var myRegOpForceFromCloud       = null;
 var myRegDataFromOp             = null;
 
@@ -64,6 +73,20 @@ function PrintLog(level, txt)
     {
         myBox.value += "\n(" + d.getMinutes() + ":" + d.getSeconds() + ")" + txt;
     }
+    else if( level == 2 )
+    {
+        // Add a blank line
+        myBox.value += "\n\n(" + d.getMinutes() + ":" + d.getSeconds() + ")" + txt;
+    }
+    else if( level == 3 )
+    {
+        // Add a blank line before and after
+        myBox.value += "\n\n(" + d.getMinutes() + ":" + d.getSeconds() + ")" + txt + "\n";
+    }
+    else
+    {
+        myBox.value += "\n(" + d.getMinutes() + ":" + d.getSeconds() + ")" + txt;
+    }
 
     myBox.scrollTop = myBox.scrollHeight;
 }
@@ -74,32 +97,30 @@ function renderView()
 {
     var myHtml = 
   
-    "<br><br><br>" +
+    "<br>" +
     "<div class='downloadSelectContainer'>" +
-    
-    
     "<table id='axedaTable' align='left'>" +
-    "<tr> <th style='padding: 10px;' colspan='4'>Axeda Test Menu</th></tr>" + 
+    "<tr> <th id='asset_id' style='padding: 10px;' colspan='4'>Axeda Test Menu - </th></tr>" + 
     "<tr> <th>Test</th>  <th>Action</th> <th>Status</th> <th>Description</th> </tr>" +
-    "<tr> <td><br>Get User Info</td> <td><input type='button' value='Start Test' onclick='getUserTest()'></input></td>     <td id='s0'>Not Started</td>  <td class='desc' id='d0'>Send getUserInfoAction:false then true.<br>Poll until getUserInfoAction is sent back, 30 seconds max.</td></tr>" +
-    "<tr> <td><br>CU</td>     <td id='v1'></td>  <td id='c1'></td> <td id='s1'>N/A</td> </tr>" +
-    "<tr> <td><br>NU PIC</td> <td id='v2'></td>  <td id='c2'></td> <td id='s2'>N/A</td> </tr>" +
-    "<tr> <td><br>CU PIC</td> <td id='v3'></td>  <td id='c3'></td> <td id='s3'>N/A</td> </tr>" +
-    "<tr> <td><br>CU BT</td>  <td id='v4'></td>  <td id='c4'></td> <td id='s4'>N/A</td> </tr>" +
-    "<tr> <td style='padding: 20px;' colspan='4'><input style='font-size: 24px;' id='update_id' type='button' value='Update' onclick='Dld.handleDldKey()'></input> </td> </tr>" +
+    "<tr> <td><br>Get User Info</td> <td><input type='button' value='Start Test' onclick='getUserTest()'></input></td>            <td id='s0'>Not Started</td>  <td class='desc'>Send getUserInfoAction:false then true.<br>Poll every 2 sec until 'getUserInfoAction' is sent back, 30 polls max.</td></tr>" +
+    "<tr> <td><br>Get SKU</td>       <td><input type='button' value='Start Test' onclick='getSkuTest()'></input></td>             <td id='s1'>Not Started</td>  <td class='desc'>Send SKU_Number:'test' to clear.<br>Send 'UniqueId':'0x4713e3b9a4a30a20'.<br>SKU_Number should be updated to: 590N412-002-10.</td></tr>" +
+    "<tr> <td><br>Get Reg Info</td>  <td><input type='button' value='Start Test' onclick='getRegTest()'></input></td>             <td id='s2'>Not Started</td>  <td class='desc'>Send 'regAction':'false' then 'regAction':'true'.<br>Poll every 2 sec until 'regOpForce' is sent back, 30 polls max.</td></tr>" +
+    "<tr> <td><br>Get Update False</td>  <td><input type='button' value='Start Test' onclick='getUpdateFalseTest()'></input></td> <td id='s3'>Not Started</td>  <td class='desc'>Send 'SwVerCU_CF':'700.036.099.099'. <br>Send 'isUpdateAvailable':'false' then 'isUpdateAvailable':'true'.<br>Poll every 2 sec until 'isUpdateAvailable' is sent back, 30 polls max.</td></tr>" +
+    "<tr> <td><br>Get Update True</td>   <td><input type='button' value='Start Test' onclick='getUpdateTrueTest()'></input></td>  <td id='s4'>Not Started</td>  <td class='desc'>Send 'SwVerCU_CF':'700.036.000.000'. <br>Send 'isUpdateAvailable':'false' then 'isUpdateAvailable':'true'.<br>Poll every 2 sec until 'isUpdateAvailable' is sent back, 30 polls max.</td></tr>" +
     "</table> </div>" +
     
-    "<textarea id='textBox_id' rows='40' cols='140'>Axeda Test Log</textarea>";
+    "<textarea id='textBox_id' rows='40' cols='120'>Axeda Test Log</textarea>";
     
     $('body').html(myHtml); 
                 
+    document.getElementById('asset_id').innerHTML += "  Model: " + myModel + " SN: " + mySn;
 
 }
 
-// test User............................................................................................
+// User............................................................................................
 function getUserTest()
 {
-    PrintLog(1, "Get User Info key pressed." );
+    PrintLog(2, "Get User Info key pressed." );
     SendCloudAsset();
     SendCloudData( "'getUserInfoAction':'false'" );
     SendCloudData( "'getUserInfoAction':'true'" );
@@ -108,28 +129,202 @@ function getUserTest()
     getUserInfoActionFromCloud = null;
     loopState                  = STATE_GET_USER_INFO;
     MainLoopIntervalHandle = setInterval( mainLoop, 2000 );
-    
+    document.getElementById('s0').innerHTML = "Starting";
      
 }
+
+
+// SKU............................................................................................
+function getSkuTest()
+{
+    PrintLog(2, "Get SKU Test key pressed." );
+    SendCloudAsset();
+    SendCloudData( "'SKU_Number':'test'" );
+    
+    loopState                  = STATE_GET_SKU;
+    MainLoopIntervalHandle = setInterval( mainLoop, 2000 );
+    document.getElementById('s1').innerHTML = "Starting";
+     
+}
+
+
+// Registration............................................................................................
+function getRegTest()
+{
+    PrintLog(2, "Get Reg Info key pressed." );
+    SendCloudAsset();
+    SendCloudData( "'regAction':'false'" );
+    SendCloudData( "'regAction':'true'" );
+    uMainLoopCounter           = 0;
+    bGotRegInfoRspFromCloud    = false;
+    loopState                  = STATE_GET_REG_INFO;
+    MainLoopIntervalHandle = setInterval( mainLoop, 2000 );
+    document.getElementById('s2').innerHTML = "Starting";
+     
+}
+
+
+// Get Update False............................................................................................
+// Set the SwVerCU_CF version greater than the package version so that isUpdateAvailable should return a false.
+function getUpdateFalseTest()
+{
+    PrintLog(2, "Get Update False key pressed." );
+    SendCloudAsset();
+    SendCloudData( "'SwVerCU_CF':'700.036.099.099'" );    
+    SendCloudData( "'isUpdateAvailable':'false'" );
+
+    uMainLoopCounter                = 0;
+    bGotUpdateAvailableRspFromCloud = false;
+    loopState                       = STATE_GET_UPDATE_FALSE;
+    MainLoopIntervalHandle = setInterval( mainLoop, 2000 );
+    document.getElementById('s3').innerHTML = "Starting";
+}
+
+
+
+// Get Update True............................................................................................
+// Set the SwVerCU_CF version less than the package version so that isUpdateAvailable should return a true.
+// Also wait for "package" from Axeda.
+function getUpdateTrueTest()
+{
+    PrintLog(2, "Get Update True key pressed." );
+    SendCloudAsset();
+//    SendCloudData( "'SwVerCU_CF':'700.036.000.000'" );    
+//    SendCloudData( "'SwVerCU_CF':'700.036.ede.ded'" );    
+    SendCloudData( "'SwVerCU_CF':'700.036.99.99'" );    
+    SendCloudData( "'isUpdateAvailable':'false'" );
+    uMainLoopCounter                 = 0;
+    bGotUpdateAvailableRspFromCloud  = false;
+    bGotPackageAvailableRspFromCloud = false;    
+    fileNuCfCldId                    = 0;
+    fileCuCfCldId                    = 0;
+    fileNuPicCldId                   = 0;
+    fileCuPicCldId                   = 0;
+    fileBtCldId                      = 0;
+    
+    loopState                       = STATE_GET_UPDATE_TRUE;
+    MainLoopIntervalHandle = setInterval( mainLoop, 2000 );
+    document.getElementById('s4').innerHTML = "Starting";
+}
+
+
+
+
 
 
 // main loop............................................................................................
 function mainLoop()
 {
-    SendCloudPoll();
-    
+
+    uMainLoopCounter++;
+        
     switch(loopState)
     {
         case STATE_GET_USER_INFO:
         {
-
             if( bGotUserInfoRspFromCloud )
             {
-                PrintLog(1, "Egress response: getUserInfoAction from cloud = " + getUserInfoActionFromCloud );
+                PrintLog(1, "Get User Info Passed.  Egress response: getUserInfoAction from cloud = " + getUserInfoActionFromCloud );
                 clearInterval(MainLoopIntervalHandle);
+                document.getElementById('s0').innerHTML = "Pass";
+            } 
+            else
+            {
+                SendCloudPoll();        
+                document.getElementById('s0').innerHTML = "Poll: " + uMainLoopCounter;
+            } 
+            break;
+        }
+
+
+        case STATE_GET_SKU:
+        {
+            SendCloudData( "'UniqueId':'0x4713e3b9a4a30a20'" );         // Should cause the Axeda code to get 590N412-002-10
+            document.getElementById('s1').innerHTML = "Check Axeda";
+            clearInterval(MainLoopIntervalHandle);
+            break;
+        }
+
+        case STATE_GET_REG_INFO:
+        {
+            if( bGotRegInfoRspFromCloud )
+            {
+                PrintLog(1, "Get Reg Info Passed.  Egress response: regOpForce from cloud = " + myRegOpForceFromCloud );
+                clearInterval(MainLoopIntervalHandle);
+                document.getElementById('s2').innerHTML = "Pass";
+            }
+            else
+            {
+              SendCloudPoll();        
+              document.getElementById('s2').innerHTML = "Poll: " + uMainLoopCounter;
             }  
             break;
         }
+
+
+        case STATE_GET_UPDATE_FALSE:
+        {
+            if( uMainLoopCounter == 1 )
+            {
+                SendCloudData( "'isUpdateAvailable':'true'" );
+            }
+                  
+            if( bGotUpdateAvailableRspFromCloud )
+            {
+                clearInterval(MainLoopIntervalHandle);
+                if( isUpdateAvailableFromCloud == "true" )
+                {
+                    PrintLog(1, "Get Update False: Failed.  Egress response: isUpdateAvailable from cloud = " + isUpdateAvailableFromCloud );
+                    document.getElementById('s3').innerHTML = "Fail";
+                }
+                else
+                {
+                    PrintLog(1, "Get Update False: Passed.  Egress response: isUpdateAvailable from cloud = " + isUpdateAvailableFromCloud );
+                    document.getElementById('s3').innerHTML = "Pass";
+                }
+                
+            }
+            else
+            {
+                SendCloudPoll();  
+                document.getElementById('s3').innerHTML = "Poll: " + uMainLoopCounter;
+            }
+               
+            break;
+        }
+
+
+        case STATE_GET_UPDATE_TRUE:
+        {
+            if( uMainLoopCounter == 1 )
+            {
+                SendCloudData( "'isUpdateAvailable':'true'" );
+            }
+        
+            if( bGotUpdateAvailableRspFromCloud && bGotPackageAvailableRspFromCloud )
+            {
+                clearInterval(MainLoopIntervalHandle);
+                if( isUpdateAvailableFromCloud == "true" )
+                {
+                    PrintLog(1, "Get Update True: Passed.  Egress response: isUpdateAvailable from cloud = " + isUpdateAvailableFromCloud );
+                    document.getElementById('s4').innerHTML = "Pass";
+                }
+                else
+                {
+                    PrintLog(1, "Get Update True: Failed.  Egress response: isUpdateAvailable from cloud = " + isUpdateAvailableFromCloud );
+                    document.getElementById('s4').innerHTML = "Fail";
+                }
+                
+            }
+            else
+            {
+                SendCloudPoll();  
+                document.getElementById('s4').innerHTML = "Poll: " + uMainLoopCounter;
+            }  
+            break;
+        }
+
+
         
         case STATE_DONE:
         {
@@ -140,7 +335,7 @@ function mainLoop()
         
     }
     
-    uMainLoopCounter++;
+
             
     if( uMainLoopCounter >= uMainLoopCounterMax )
     {
@@ -148,6 +343,37 @@ function mainLoop()
         clearInterval(MainLoopIntervalHandle);
         
         PrintLog(1, "Loop max reached..." );
+        
+        switch(loopState)
+        {
+            case STATE_GET_USER_INFO:
+            {
+                document.getElementById('s0').innerHTML = "Fail";
+                break;
+            }
+
+            case STATE_GET_REG_INFO:
+            {
+                document.getElementById('s2').innerHTML = "Fail";
+                break;
+            }
+
+            case STATE_GET_UPDATE_FALSE:
+            {
+                document.getElementById('s3').innerHTML = "Fail";
+                break;
+            }
+
+            case STATE_GET_UPDATE_TRUE:
+            {
+                document.getElementById('s4').innerHTML = "Fail";
+                break;
+            }
+
+            
+        }
+        
+        
     }
 
 }
@@ -171,7 +397,7 @@ function ProcessEgressResponse(eg)
     egStr = JSON.stringify(eg);
     if( egStr.search("set") != -1 )
     {
-        PrintLog(1, "Egress: Number of set items equals " + eg.set.length );
+//        PrintLog(1, "Egress: Number of set items equals " + eg.set.length );
     
         for( i = 0; i < eg.set.length; i++ )
         {
@@ -195,7 +421,7 @@ function ProcessEgressResponse(eg)
   */
                     
             // Search for strings associated with Registration egress...
-            else if( egStr.search("regOpForce")        != -1 )   myRegOpForceFromCloud      = eg.set[i].items.regOpForce;       // true to force
+            else if( egStr.search("regOpForce")        != -1 )   {bGotRegInfoRspFromCloud = true; myRegOpForceFromCloud      = eg.set[i].items.regOpForce;}       // true to force
             else if( egStr.search("regDataFromOp")     != -1 )   myRegDataFromOp            = eg.set[i].items.regDataFromOp;
     
             
@@ -257,8 +483,8 @@ function ProcessEgressResponse(eg)
     }  
     
     
-PrintLog(1, "Egress:  bGotUserInfoRspFromCloud=" + bGotUserInfoRspFromCloud + " getUserInfoActionFromCloud=" + getUserInfoActionFromCloud );    
-PrintLog(1, "Egress:  isUpdateAvailableFromCloud=" + isUpdateAvailableFromCloud + " bGotUpdateAvailableRspFromCloud=" + bGotUpdateAvailableRspFromCloud + " bGotPackageAvailableRspFromCloud=" + bGotPackageAvailableRspFromCloud );    
+// PrintLog(1, "Egress:  bGotUserInfoRspFromCloud=" + bGotUserInfoRspFromCloud + " getUserInfoActionFromCloud=" + getUserInfoActionFromCloud );    
+// PrintLog(1, "Egress:  isUpdateAvailableFromCloud=" + isUpdateAvailableFromCloud + " bGotUpdateAvailableRspFromCloud=" + bGotUpdateAvailableRspFromCloud + " bGotPackageAvailableRspFromCloud=" + bGotPackageAvailableRspFromCloud );    
     
 }
 
@@ -281,17 +507,16 @@ function SendCloudAsset()
         
         $.ajax({
             type       : "POST",
-            crossDomain: true,
+//            crossDomain: true,
             url        : myAssetUrl,
-//            contentType: "application/json;charset=utf-8",
-            contentType: "Access-Control-Allow-Headers: Content-Type",
+            contentType: "application/json;charset=utf-8",
             data       : myAsset,
             dataType   : 'json',    // response format
             success    : function(response) 
                         {
-                            PrintLog( 1, "Response success: SendCloudAsset()..." + JSON.stringify(response) );
                             if( response != null )
                             {
+                                PrintLog( 3, "Response success: SendCloudAsset()..." + JSON.stringify(response) );
                                 ProcessEgressResponse(response);
                             }
                         },
@@ -319,16 +544,16 @@ function SendCloudData(dataText)
         
         $.ajax({
             type       : "POST",
-            crossDomain: true,            
+//            crossDomain: true,            
             url        : myDataUrl,
             contentType: "application/json;charset=utf-8",
             data       : myData,
             dataType   : 'json',    // response format
             success    : function(response) 
                         {
-                            PrintLog( 1, "Response success: SendCloudData()..." + JSON.stringify(response)  );
                             if( response != null )
                             {
+                                PrintLog( 3, "Response success: SendCloudData()..." + JSON.stringify(response)  );
                                 ProcessEgressResponse(response);
                             }
                         },
@@ -356,16 +581,16 @@ function SendCloudLocation(lat, long)
         
         $.ajax({
             type       : "POST",
-            crossDomain: true,            
+//            crossDomain: true,            
             url        : myDataUrl,
             contentType: "application/json;charset=utf-8",
             data       : myData,
             dataType   : 'json',    // response format
             success    : function(response) 
                         {
-                            PrintLog( 1, "Response success: SendCloudLocation()..." + JSON.stringify(response) );
                             if( response != null )
                             {
+                                PrintLog( 3, "Response success: SendCloudLocation()..." + JSON.stringify(response) );
                                 ProcessEgressResponse(response);
                             }
                         },
@@ -402,9 +627,9 @@ function SendCloudEgressStatus(packageId, myStatus)
             dataType   : 'json',    // response format
             success    : function(response) 
                         {
-                            PrintLog( 1, "Response success: SendCloudEgressStatus()..." + JSON.stringify(response) );
                             if( response != null )
                             {
+                                PrintLog( 3, "Response success: SendCloudEgressStatus()..." + JSON.stringify(response) );
                                 ProcessEgressResponse(response);
                             }
                         },
@@ -431,16 +656,16 @@ function SendCloudPoll()
         
         $.ajax({
             type       : "POST",
-            crossDomain: true,            
+//            crossDomain: true,            
             url        : myAssetUrl,
 //            contentType: "application/json;charset=utf-8",
 //            data       : myAsset,
             dataType   : 'json',    // response format
             success    : function(response) 
                         {
-                            PrintLog( 1, "Response success: SendCloudPoll()..." + JSON.stringify(response) );
                             if( response != null )
                             {
+                                PrintLog( 3, "Response success: SendCloudPoll()..." + JSON.stringify(response) );
                                 ProcessEgressResponse(response);
                             }
                         },
@@ -457,865 +682,6 @@ function SendCloudPoll()
 
 
 
-// Geolocation Callbacks
-// HandleConfirmLocation.......................................................................................
-// process the confirmation dialog result
-function HandleConfirmLocation(buttonIndex) 
-{
-    // buttonIndex = 0 if dialog dismissed, i.e. back button pressed.
-    // buttonIndex = 1 if 'Yes' to use location information.
-    // buttonIndex = 2 if 'No'
-    if( buttonIndex == 1 )
-    {
-        // Request location...
-        navigator.geolocation.getCurrentPosition(geoSuccess, geoError, {timeout:10000});
-
-    }
-}
-
-
-
-// This method accepts a Position object, which contains the
-// current GPS coordinates
-//
-function geoSuccess(position) 
-{
-    SendCloudLocation( position.coords.latitude, position.coords.longitude );
-/*    
-    alert('Latitude: '          + position.coords.latitude          + '\n' +
-          'Longitude: '         + position.coords.longitude         + '\n' +
-          'Altitude: '          + position.coords.altitude          + '\n' +
-          'Accuracy: '          + position.coords.accuracy          + '\n' +
-          'Altitude Accuracy: ' + position.coords.altitudeAccuracy  + '\n' +
-          'Heading: '           + position.coords.heading           + '\n' +
-          'Speed: '             + position.coords.speed             + '\n' +
-          'Timestamp: '         + position.timestamp                + '\n');
-*/          
-}
-
-// geoError Callback receives a PositionError object
-//
-function geoError(error) 
-{
-    // Send in the default...
-    SendCloudLocation( myLat, myLong );
-/* 
-silent...
-
-    alert('code: '    + error.code    + '\n' +
-          'message: ' + error.message + '\n');
-*/          
-}
-
-
-// HandlePrivacyConfirmation.......................................................................................
-function HandlePrivacyConfirmation(buttonIndex) 
-{
-    // buttonIndex = 0 if dialog dismissed, i.e. back button pressed.
-    // buttonIndex = 1 if 'Ok'
-    if( buttonIndex == 1 )
-    {
-        // Ok...
-        bPrivacyViewed = true;
-        
-        if( isBluetoothCnx == false )
-        {
-            // Start the spinner..
-            SpinnerStart( "Please wait", "Searching for Cel-Fi devices..." );
-            UpdateStatusLine("Searching for Cel-Fi devices...");
-        }
-        
-        // jdo:  Save to non-vol after first hit.
-                
-    }
-}
-
-
-
-            
-            
-            
-function showAlert(message, title) 
-{
-  if(window.isPhone) 
-  {
-    navigator.notification.alert(message, null, title, 'ok');
-  } 
-  else 
-  {
-    alert(title ? (title + ": " + message) : message);
-  }
-}
-
-
-
-
-
-
-// ..................................................................................
-var app = {
-     
-    // deviceready Event Handler
-    //
-  	// PhoneGap is now loaded and it is now safe to make calls using PhoneGap
-    //
-    onDeviceReady: function() {
-    
-        if( ImRunningOnBrowser == false )
-        {
-    	   PrintLog(10,  "device ready:  Running on phone version: " + window.device.version + " parseFloat:" + parseFloat(window.device.version) );
-    	}
-    	
-    	isNxtyStatusCurrent = false;
-    	isNxtySnCurrent     = false;
-    	
-
-
-		// Register the event listener if the back button is pressed...
-        document.addEventListener("backbutton", app.onBackKeyDown, false);
-        
-        app.renderHomeView();
-        
-        // Only start bluetooth if on a phone...
-        if( window.isPhone )
-        {
-            
-            if( window.device.platform == iOSPlatform )
-            {
-                if (parseFloat(window.device.version) >= 7.0) 
-                {
-                    StatusBar.hide();
-                }
-            } 
-            
-            StartBluetooth();
-                       
-        }        
-    },   
-       
-       
-
-    // Handle the back button
-    //
-    onBackKeyDown: function() 
-    {
-        
-        if( currentView == "main" )
-        {
-            navigator.notification.confirm(
-                        'Do you want to exit the App?',    // message
-                        HandleExitApp,                     // callback to invoke with index of button pressed
-                        'Exit App',                        // title
-                        ['Exit', 'Cancel'] );              // buttonLabels
-        }
-        else if( currentView == "registration" )
-        {
-            reg.handleBackKey();
-        }
-        else if( currentView == "tech" )
-        {
-            tech.handleBackKey();
-        }
-        else if( currentView == "settings" )
-        {
-            Stg.handleBackKey();
-        }
-        else if( currentView == "download" )
-        {
-            Dld.handleBackKey();
-        }
-        else
-        {
-            showAlert("Back to where?", "Back...");
-        }
-        
-    },
-
-
-
-	// Handle the Check for SW Update key
-	handleSwUpdateKey: function(id)
-	{
-	    // Handle if button is displayed...
-	    if( document.getElementById('sw_button_id').innerHTML.length > 10 )
-	    {
-    	 	PrintLog(1, "SW Update key pressed");
-            clearInterval(MainLoopIntervalHandle);	
-     	
-    	 	if( isBluetoothCnx )
-    	 	{
-                Dld.renderDldView();  
-    	 	}
-            else
-            {
-                if( ImRunningOnBrowser )
-                {
-                    // Allow the browser to go into
-                    Dld.renderDldView();
-                }
-                else
-                {       
-                    showAlert("SW Update mode not allowed...", "Bluetooth not connected.");
-                }
-            }
-            
-    
-    // Try various things...
-    
-    
-    /*
-    if( isRegistered )
-    {
-        // Unregister...
-        showAlert("Just sent command to unregister...", "Unregister.");
-        var u8Buff  = new Uint8Array(20);
-        u8Buff[0] = 0x81;                               // Redirect to NU on entry and exit...   
-        u8Buff[1] = (NXTY_PCCTRL_GLOBALFLAGS >> 24);    // Note that javascript converts var to INT32 for shift operations.
-        u8Buff[2] = (NXTY_PCCTRL_GLOBALFLAGS >> 16);
-        u8Buff[3] = (NXTY_PCCTRL_GLOBALFLAGS >> 8);
-        u8Buff[4] = NXTY_PCCTRL_GLOBALFLAGS;
-        u8Buff[5] = 0xF1;                    // Note that javascript converts var to INT32 for shift operations.
-        u8Buff[6] = 0xAC;
-        u8Buff[7] = 0x00;
-        u8Buff[8] = 0x01;
-        
-        nxty.SendNxtyMsg(NXTY_CONTROL_WRITE_REQ, u8Buff, 9);
-    }
-    else
-    {
-        // Register and clear Loc Lock
-        showAlert("Just sent command to register and clear loc lock...", "Register.");
-        var u8Buff  = new Uint8Array(20);
-        u8Buff[0] = 0x01;                               // Redirect to NU on entry...   
-        u8Buff[1] = (NXTY_PCCTRL_GLOBALFLAGS >> 24);    // Note that javascript converts var to INT32 for shift operations.
-        u8Buff[2] = (NXTY_PCCTRL_GLOBALFLAGS >> 16);
-        u8Buff[3] = (NXTY_PCCTRL_GLOBALFLAGS >> 8);
-        u8Buff[4] = NXTY_PCCTRL_GLOBALFLAGS;
-        u8Buff[5] = 0xF1;                    // Note that javascript converts var to INT32 for shift operations.
-        u8Buff[6] = 0xAC;
-        u8Buff[7] = 0x01;
-        u8Buff[8] = 0x00;
-        nxty.SendNxtyMsg(NXTY_CONTROL_WRITE_REQ, u8Buff, 9);
-        
-        
-        
-        u8Buff[0] = 0x80;                               // Redirect to CU on exit...   
-        u8Buff[1] = 0xF0;   // CellIdTime
-        u8Buff[2] = 0x00;
-        u8Buff[3] = 0x00;
-        u8Buff[4] = 0x2C;
-        u8Buff[5] = 0xDA;   // LOC_LOCK_RESET_VAL     
-        u8Buff[6] = 0xBA;
-        u8Buff[7] = 0xDA;
-        u8Buff[8] = 0xBA;
-        
-        nxty.SendNxtyMsg(NXTY_CONTROL_WRITE_REQ, u8Buff, 9);
-        
-    }
-    */
-    
-    /*
-    var rsp = {set:[
-        {items:{firstName:"John"},priority:0},
-        {items:{lastName:"Doe"},priority:0},
-        {items:{city:"San Clemente"},priority:0},
-        {items:{getUserInfoAction:"true"},priority:0},
-        ]} ;
-    */
-    
-    /*
-    var rsp = {packages:[
-                {id:641, instructions:[{"@type":"down", id:921, fn:"WuExecutable.sec", fp:"."}],priority:0,time:1414810929705},
-                {id:642, instructions:[{"@type":"down", id:922, fn:"BTFlashImg.bin", fp:"."}], priority:0,time:1414810929705}
-                ],
-                
-              set:[
-                {items:{getUserInfoAction:true},priority:0},
-                {items:{firstName:"John"},priority:0},
-                {items:{lastName:"Doe"},priority:0},
-                {items:{addr_1:"12345 Cell Rd"},priority:0},
-                {items:{addr_2:"whitefield"},priority:0},
-                {items:{city:"NewYorkCity"},priority:0},
-                {items:{state:"Hello"},priority:0},
-                {items:{zip:"56789"},priority:0},
-                {items:{SwVer_BT_CldVer:"00.04"},priority:0},
-                {items:{country:"USA"},priority:0},
-                {items:{phone:"1112223333"},priority:0}]};                      
-    
-    PrintLog( 1, "Rsp..." + JSON.stringify(rsp) );
-    ProcessEgressResponse(rsp);
-    */    
-    
-    
-    
-    /*
-    var x  = "regOpForce:true";
-    var u8 = new Uint8Array(30);
-    
-    for( var i = 0; i < x.length; i++ )
-    {
-        u8[i] = x.charCodeAt(i); 
-    }
-    
-    nxty.SendNxtyMsg(NXTY_REGISTRATION_REQ, u8, x.length ); 
-    */
-            
-        } // if button is displayed...            
-        
-	},
-
-
-	// Handle the Tech Mode key
-	handleTechModeKey: function()
-	{
-	    // Handle if button is displayed...
-        if( document.getElementById('tk_button_id').innerHTML.length > 10 )
-        {
-    	 	PrintLog(1, "Tech Mode key pressed");
-            clearInterval(MainLoopIntervalHandle); 
-                	 	
-    	 	if( isBluetoothCnx )
-    	 	{
-     	 		tech.renderTechView();
-    	 	}
-    	 	else
-    	 	{
-                if( ImRunningOnBrowser )
-                {
-                    // Allow the browser to go into Tech mode
-                    tech.renderTechView();
-                }
-                else
-                {	 	
-    	            showAlert("Tech mode not allowed...", "Bluetooth not connected.");
-    	        }
-    	 	}
-    	 	
-        }   // if button is displayed...
-	},
-
-    // Handle the Settings key
-    handleSettingsKey: function()
-    {
-        // Handle if button is displayed...
-        if( document.getElementById('st_button_id').innerHTML.length > 10 )
-        {
-            PrintLog(1, "Settings key pressed");
-            clearInterval(MainLoopIntervalHandle);  
-           
-            if( isBluetoothCnx )
-            {
-                Stg.renderSettingsView();
-            }
-            else
-            {
-                if( ImRunningOnBrowser )
-                {
-                    // Allow the browser to go into Settings mode
-                    Stg.renderSettingsView();
-                }
-                else
-                {       
-                    showAlert("Settings mode not allowed...", "Bluetooth not connected.");
-                }
-            }
-        }   // If button is displayed
-    },
-
-	// Handle the Register key
-	handleRegKey: function()
-	{
-        // Handle if button is displayed...
-        if( document.getElementById('reg_button_id').innerHTML.length > 10 )
-        {
-    	 	PrintLog(1, "Reg key pressed");
-            clearInterval(MainLoopIntervalHandle);  
-    	 	
-    	 	if( isBluetoothCnx )
-    	 	{
-    	 	    SendCloudPoll();
-    			reg.renderRegView();
-    	 	}
-    	 	else
-    	 	{
-                if( ImRunningOnBrowser )
-                {
-                    reg.renderRegView();
-                }
-                else
-                {
-                    showAlert("Registration mode not allowed...", "Bluetooth not connected.");
-                }
-    	 	}
-        }   // if button is displayed
-	},
-	
-	
-
-
-	renderHomeView: function() 
-	{
-		var myBluetoothIcon = isBluetoothCnx ? "<div id='bt_icon_id' class='bt_icon'>" + szBtIconOn + "</div>" : "<div  id='bt_icon_id' class='bt_icon'>" + szBtIconOff + "</div>";
-		var myRegIcon       = (nxtyRxRegLockStatus == 0x00) ? "<div id='reg_icon_id' class='reg_icon'></div>" : isRegistered ? "<div id='reg_icon_id' class='reg_icon'>" + szRegIconReg + "</div>" : "<div id='reg_icon_id' class='reg_icon'>" + szRegIconNotReg + "</div>";
-		
-		var myHtml = 
-			"<img src='img/header_main.png' width='100%' />" +
-			
-   			myBluetoothIcon +
-            myRegIcon +
-   			"<button id='sw_button_id'  type='button' class='mybutton' onclick='app.handleSwUpdateKey()'></button>" +
-			"<button id='tk_button_id'  type='button' class='mybutton' onclick='app.handleTechModeKey()'></button>" +
-            "<button id='st_button_id'  type='button' class='mybutton' onclick='app.handleSettingsKey()'></button>" +
-  			"<button id='reg_button_id' type='button' class='mybutton' onclick='app.handleRegKey()'></button>" +
-  			
-  			
-  			szMyStatusLine;
-  			
-
-		$('body').html(myHtml); 
-		
-	    
-	    // Make the buttons change when touched...    
- 		document.getElementById("sw_button_id").addEventListener('touchstart', HandleButtonDown );
- 		document.getElementById("sw_button_id").addEventListener('touchend',   HandleButtonUp );
- 		
- 		document.getElementById("tk_button_id").addEventListener('touchstart', HandleButtonDown );
- 		document.getElementById("tk_button_id").addEventListener('touchend',   HandleButtonUp );
-
-        document.getElementById("st_button_id").addEventListener('touchstart', HandleButtonDown );
-        document.getElementById("st_button_id").addEventListener('touchend',   HandleButtonUp );
- 		
- 		document.getElementById("reg_button_id").addEventListener('touchstart', HandleButtonDown );
- 		document.getElementById("reg_button_id").addEventListener('touchend',   HandleButtonUp );
-
-
-        // Start with the buttons disabled...
-        document.getElementById("sw_button_id").disabled  = true;
-        document.getElementById("tk_button_id").disabled  = true;
-        document.getElementById("st_button_id").disabled  = true; 
-        document.getElementById("reg_button_id").disabled = true;  
-		
-		uMainLoopCounter = 0;
-
-			
-        // Throw the buttons up for testing... 
-        if( ImRunningOnBrowser )
-        {
-            document.getElementById("sw_button_id").innerHTML = "<img src='img/button_SwUpdate.png' />";
-            document.getElementById("tk_button_id").innerHTML = "<img src='img/button_TechMode.png' />";
-            document.getElementById("st_button_id").innerHTML = "<img src='img/button_Settings.png' />"; 
-            document.getElementById("reg_button_id").innerHTML = "<img src='img/button_Register.png' />";  
-            
-            // Enable the buttons...
-            document.getElementById("sw_button_id").disabled  = false;
-            document.getElementById("tk_button_id").disabled  = false;
-            document.getElementById("st_button_id").disabled  = false; 
-            document.getElementById("reg_button_id").disabled = false; 
-        }
-
-        
-        			
-        // Start the handler to be called every second...
-        MainLoopIntervalHandle = setInterval(app.mainLoop, 1000 ); 
-
-        
-                
-//        PrintLog(1, "Screen density: low=0.75 med=1.0 high=1.5  This screen=" +  window.devicePixelRatio );    
-        
-                        
-        currentView = "main";
-	},
-
-
-	initialize: function() 
-	{
-		if( ImRunningOnBrowser )
-		{
-			PrintLog(10, "running on browser");
-	
-	
-	        // Browser...
-	        window.isPhone = false;
-	        isRegistered   = false;
-	        this.onDeviceReady();
-	    }
-	    else
-	    {
-		 	PrintLog(10, "running on phone");
-		 	
-	        // On a phone....
-	        window.isPhone = true;
-		 		        
-	        // Call onDeviceReady when PhoneGap is loaded.
-	        //
-	        // At this point, the document has loaded but phonegap-1.0.0.js has not.
-	        // When PhoneGap is loaded and talking with the native device,
-	        // it will call the event `deviceready`.
-	        // 
-	        document.addEventListener('deviceready', this.onDeviceReady, false);
-        }
-
-	},
-
-
-
-
-	mainLoop: function() 
-	{
-        var u8TempBuff = new Uint8Array(5);  
-		PrintLog(4, "App: Main loop..." );
-		
-		if( bCheckBluetoothOnStartup )
-		{
-    		if( isBluetoothStarted == false )
-    		{
-    		  // Do nothing until bluetooth has started...
-    		  return;
-    		}
-    		else
-    		{
-                // Bluetooth is not connected...see if user enabled...
-                if( isBluetoothEnabled == false )
-                {
-                    if( uMainLoopCounter == 0 )
-                    {
-                        SpinnerStart( "Bluetooth Required", "Exiting App..." );
-                        UpdateStatusLine( "Bluetooth Required: Exiting App..." );
-                    }
-                    
-                    if( ++uMainLoopCounter >= 4 )
-                    {
-                        // Kill the app...
-                        navigator.app.exitApp();
-                    }
-                    
-                    return;
-                }
-                else
-                {
-                    // Normal flow should come here once bluetooth has been enabled...
-                    bCheckBluetoothOnStartup = false;
-                    
-                    // Privacy policy...
-                    navigator.notification.confirm(
-                        'Your privacy is important to us. Please refer to www.cel-fi.com/privacypolicy for our detailed privacy policy.',    // message
-                        HandlePrivacyConfirmation,      // callback to invoke with index of button pressed
-                        'Privacy Policy',               // title
-                        ['Ok'] );                       // buttonLabels
-        
-                    UpdateStatusLine("Privacy policy...");                    
-                }
-    		}
-        }
-		
-		if( bPrivacyViewed == false )
-		{
-		  UpdateStatusLine("App sw: " + szVerApp + "  Cel-fi BT sw: " + swVerBtScan);
-          PrintLog(1, "App sw ver: " + szVerApp + "  Cel-fi BT sw ver: " + swVerBtScan );
-		  return;
-		}
-		
-        if( isBluetoothCnx && (bNaking == false) )
-        {
-            if( isNxtyStatusCurrent == false )
-            {
-                if( uMainLoopCounter == 0 )
-                {
-                    // See if we have a network connection, i.e. WiFi or Cell.
-                    isNetworkConnected = (navigator.connection.type == Connection.NONE)?false:true;
-                    
-                    // Start the spinner..
-                    SpinnerStart( "Please wait", "Syncing data..." );
-                    
-                }
-                
-                // Get the status...returns build config which is used as model number
-                nxty.SendNxtyMsg(NXTY_STATUS_REQ, null, 0);
-                UpdateStatusLine("Retrieving model number...");
-            } 
-            else if( isNxtySnCurrent == false )
-            {
-
-                // Get the CU serial number...used by the platform 
-                nxtyCurrentReq  = NXTY_SEL_PARAM_REG_SN_TYPE;
-                u8TempBuff[0]   = NXTY_SW_CF_CU_TYPE;     // Select CU
-                u8TempBuff[1]   = 9;                      // System SN MSD
-                u8TempBuff[2]   = 8;                      // System SN LSD  
-                nxty.SendNxtyMsg(NXTY_SYS_INFO_REQ, u8TempBuff, 3);
-                UpdateStatusLine("Retrieving serial number...");
-
-                bSentCloud = false;
-            }
-            else if( nxtySwVerNuCf == null )
-            {
-                UpdateStatusLine("Retrieving NU SW version...");
-
-                if( bSentCloud == false )
-                {
-                    // We now have both the status and SN so notify the cloud that we are here...
-                    SendCloudAsset();
-                
-                    navigator.notification.confirm(
-                        'Provide location information?',    // message
-                        HandleConfirmLocation,              // callback to invoke with index of button pressed
-                        'Location',                         // title
-                        ['Yes', 'No'] );                    // buttonLabels
-                    
-
-        
-                    // Since this message is going to the NU, allow 3 seconds to receive the response..
-                    clearInterval(MainLoopIntervalHandle);
-                    MainLoopIntervalHandle = setInterval(app.mainLoop, 3000 );
-                    
-                    bSentCloud = true;
-                }
-                else
-                {
-                    // Since this message is going to the NU and we did not recieve it the first time, allow 6 seconds
-                    // before sending again to allow the NU redirect to time out in 5..
-                    clearInterval(MainLoopIntervalHandle);
-                    MainLoopIntervalHandle = setInterval(app.mainLoop, 6000 );
-                } 
-    
-                if( bUniiUp )  // up by default...
-                {
-                    if( (msgRxLastCmd == NXTY_NAK_RSP) && (nxtyLastNakType == NXTY_NAK_TYPE_UNIT_REDIRECT) )
-                    {
-                        // Bypass getting NU Sw Ver which we need for the reg info.
-                        nxtySwVerNuCf = "88.88.88";
-                        
-                        // Cancel and wait at least 5 seconds.
-                        cancelUartRedirect();
-                    }
-                    else
-                    {
-                        // Get the Cell Fi software version from the NU...
-                        nxtyCurrentReq    = NXTY_SW_CF_NU_TYPE;
-                        u8TempBuff[0]     = nxtyCurrentReq;
-                        nxty.SendNxtyMsg(NXTY_SW_VERSION_REQ, u8TempBuff, 1);
-                    }
-                }
-                else
-                {
-                    // Bypass getting NU Sw Ver which we need for the reg info.
-                    nxtySwVerNuCf = "99.99.99";
-                }
-            }
-            else if( nxtySwVerCuCf == null )
-            {
-                // We now have the NU SW Ver message response which has the register/lock information...
-                
-                // We now have the Cel-Fi SW version so send the data to the cloud
-                SendCloudData( "'SwVerNU_CF':'" + SwPnNuCu + nxtySwVerNuCf + "', 'BuildId_CF':'"  + nxtySwBuildIdNu + "'" );
-
-                // Get ready to receive user information for populating the registration info page
-//                SendCloudData( "'getUserInfoAction':'false'" );
-
-
-                // Crank it up since we are no longer talking to the NU...
-                clearInterval(MainLoopIntervalHandle);
-                MainLoopIntervalHandle = setInterval(app.mainLoop, 1000 );
-                            
-            
-                // Get the CU software version...
-                nxtyCurrentReq    = NXTY_SW_CF_CU_TYPE;
-                u8TempBuff[0]     = nxtyCurrentReq;
-                nxty.SendNxtyMsg(NXTY_SW_VERSION_REQ, u8TempBuff, 1);                
-                UpdateStatusLine("Retrieving CU SW version...");
-            }            
-            else if( nxtySwVerCuPic == null )
-            {
-            
-                // We now have the CU SW version so send the data to the cloud
-                SendCloudData( "'SwVerCU_CF':'" + SwPnNuCu + nxtySwVerCuCf + "'" );
-                    
-                // Request user information...
-                bGotUserInfoRspFromCloud = true;                        // jdo: 1/22/15:  No longer want to prefill data.
-//                SendCloudData( "'getUserInfoAction':'true'" );
-                                    
-                // Get the CU PIC software version...
-                nxtyCurrentReq    = NXTY_SW_CU_PIC_TYPE;
-                u8TempBuff[0]     = nxtyCurrentReq;
-                nxty.SendNxtyMsg(NXTY_SW_VERSION_REQ, u8TempBuff, 1);                
-                UpdateStatusLine("Retrieving CU PIC SW version...");
-            }
-            else if( nxtySwVerNuPic == null )
-            {
-                // We now have the CU PIC SW version so send the data to the cloud
-                SendCloudData( "'SwVerCU_PIC':'" + SwPnPic + nxtySwVerCuPic + "'" );
-                            
-                // Get the NU PIC software version...
-                nxtyCurrentReq    = NXTY_SW_NU_PIC_TYPE;
-                u8TempBuff[0]     = nxtyCurrentReq;
-                nxty.SendNxtyMsg(NXTY_SW_VERSION_REQ, u8TempBuff, 1);   
-                UpdateStatusLine("Retrieving NU PIC SW version...");                             
-            }
-            else if( nxtySwVerBt == null )
-            {
-                // We now have the NU PIC SW version so send the data to the cloud
-                SendCloudData( "'SwVerNU_PIC':'" + SwPnPic + nxtySwVerNuPic + "'" );
-                            
-                // Get the BT software version...
-                nxtyCurrentReq    = NXTY_SW_BT_TYPE;
-                u8TempBuff[0]     = nxtyCurrentReq;
-                nxty.SendNxtyMsg(NXTY_SW_VERSION_REQ, u8TempBuff, 1);                
-                UpdateStatusLine("Retrieving Bluetooth SW version...");                             
-            }
-            else if( nxtyUniqueId == null )
-            {
-                // We now have the BT SW version so send the data to the cloud
-                SendCloudData( "'SwVer_BT':'" + SwPnBt + nxtySwVerBt + "', 'OperatorCode':'" + myOperatorCode + "'"  );
-
-                                
-                // Get the Unique ID...
-                nxtyCurrentReq  = NXTY_SEL_PARAM_REG_UID_TYPE;
-                u8TempBuff[0]   = NXTY_SW_CF_CU_TYPE;
-                u8TempBuff[1]   = 2;                      // Unique ID MSD
-                u8TempBuff[2]   = 1;                      // Unique ID LSD  
-                nxty.SendNxtyMsg(NXTY_SYS_INFO_REQ, u8TempBuff, 3);
-    
-                uMainLoopCounter = 0;
-                
-                
-                // Set the isRegistered var temporarily to determine if we need to poll for cloud data or not...
-                if( (nxtyRxRegLockStatus == 0x0B) || (nxtyRxRegLockStatus == 0x07) ||       // State 8 (0x0B) or 12 (0x07)
-                    (nxtyRxRegLockStatus == 0x08) || (nxtyRxRegLockStatus == 0x09) ||       // State 5 (0x08) or 6  (0x09)
-                    (nxtyRxRegLockStatus == 0x04) || (nxtyRxRegLockStatus == 0x05) )        // State 9 (0x04) or 10 (0x05)
-                {
-                    // Not registered.
-                    isRegistered = false;
-                }
-                else if( nxtyRxRegLockStatus & 0x02 )
-                {
-                    isRegistered = true;    
-                }
-                
-                                        
-            }
-            else if( (isRegistered == false) && (bGotUserInfoRspFromCloud == false) && (uMainLoopCounter < (MAIN_LOOP_COUNTER_MAX - 2)) )
-            {
-                // Only need to stay here and try to get the user's lastName/firstName etc. data from the cloud if we are not registered or are regegistering.
-                SendCloudPoll();
-                UpdateStatusLine("Syncing User Info from platform ... " + uMainLoopCounter); 
-            }
-            else 
-            {
-                if( msgRxLastCmd == NXTY_SYS_INFO_RSP )
-                {
-                    // We we just received the Unique ID send the data to the cloud
-                    SendCloudData( "'UniqueId':'" + nxtyUniqueId + "'" );
-                }
-                
-
-                // Clear the loop timer to stop the loop...
-                clearInterval(MainLoopIntervalHandle);
-                SpinnerStop();
-                uMainLoopCounter = 0;
-                    
-                if( bUniiUp == false )
-                {   
-                    var eText = "Wireless link between Cel-Fi units is not working.  Registration status unknown.";
-                    UpdateStatusLine( eText );            
-                    navigator.notification.confirm(
-                        eText,    // message
-                        HandleUniiRetry,                    // callback to invoke with index of button pressed
-                        'UNII Link Down',                   // title
-                        ['Retry', 'End'] );                 // buttonLabels                                     
-                }
-                else if( isNetworkConnected == false )
-                {
-                    var eText = "Unable to connect to cloud, no WiFi or Cell available.";
-                    showAlert( eText, "Network Status.");
-                    UpdateStatusLine( eText );
-                    navigator.notification.confirm(
-                        eText,    // message
-                        HandleCloudRetry,                    // callback to invoke with index of button pressed
-                        'No WiFi or Cell',                   // title
-                        ['Retry', 'End'] );                 // buttonLabels                                     
-                                                 
-                }
-                else if( nxtyRxRegLockStatus == 0x01 )     // State 2:  Only Loc Lock bit set.
-                {
-                    var eText = "Please call your service provider. (Reg State 2)";
-                    showAlert( eText, "Location Lock Set.");
-                    UpdateStatusLine( eText );                             
-                }  
-                else
-                {
-                    // No critical alerts so post the buttons....
-                    document.getElementById("sw_button_id").innerHTML = "<img src='img/button_SwUpdate.png' />";
-                    document.getElementById("tk_button_id").innerHTML = "<img src='img/button_TechMode.png' />";
-                    document.getElementById("st_button_id").innerHTML = "<img src='img/button_Settings.png' />";
-                    
-                    
-                    // Enable the buttons...
-                    document.getElementById("sw_button_id").disabled  = false;
-                    document.getElementById("tk_button_id").disabled  = false;
-                    document.getElementById("st_button_id").disabled  = false; 
-
-
-                    UpdateStatusLine( "Select button...<br>Connected to: " + myModel + ":" + mySn );                             
-
-                    if( (nxtyRxRegLockStatus == 0x0B) || (nxtyRxRegLockStatus == 0x07) )     // State 8 (0x0B) or 12 (0x07)
-                    {
-                        UpdateRegButton(0);     // Add the reg button.
-                        UpdateRegIcon(0);       // Set reg ICON to not registered...
-                        showAlert("Please re-register your device by selecting the register button.", "Registration Required.");
-                    }                            
-                    else if( (nxtyRxRegLockStatus == 0x08) || (nxtyRxRegLockStatus == 0x09) ||    // State 5 (0x08) or 6  (0x09)
-                             (nxtyRxRegLockStatus == 0x04) || (nxtyRxRegLockStatus == 0x05) )     // State 9 (0x04) or 10 (0x05)
-                    {
-                        UpdateRegButton(0);     // Add the reg button.
-                        UpdateRegIcon(0);       // Set reg ICON to not registered...
-                        showAlert("Please register your device by selecting the register button.", "Registration Required.");
-                    }
-                    else
-                    {
-                        if( nxtyRxRegLockStatus & 0x02 )
-                        {
-                            UpdateRegIcon(1);       // Set reg ICON to Registered...
-                        }
-                        
-                    }
-                                                            
-                    
-                    // Look at the registered status to update the cloud.   Must wait until after the nxtyRxRegLockStatus check above
-                    // so the logic will update the isRegistered variable.
-                    if( isRegistered )
-                    {
-                        SendCloudData( "'Registered':" + 1 );
-                    }
-                    else
-                    {
-                        SendCloudData( "'Registered':" + 0 );
-                    }
-                
-                } 
-            }  // End of else
-            
-
-
-            
-          
-            uMainLoopCounter++;
-            
-            if( uMainLoopCounter > MAIN_LOOP_COUNTER_MAX )
-            {
-                // Clear the loop timer to stop the loop...
-                clearInterval(MainLoopIntervalHandle);
-                SpinnerStop();
-                showAlert("Unable to sync data...", "Timeout");
-                UpdateStatusLine( "Timeout: Unable to sync data..." );
-            }
-
-        }   // End if( isBluetoothCnx )
-
-		
-	}, // End of MainLoop()
-
-
-
-};
 
 
 
