@@ -1,10 +1,10 @@
 // Axeda test..........
-//var myModel                     = "MN7";
-//var mySn                        = 900425000022;
-var myModel                     = "MN47";
-var mySn                        = 916450000005;
-var myPlatformUrl               = "https://nextivity-sandbox-connect.axeda.com:443/ammp/";
-
+var myModel                     = "MN7";
+var mySn                        = 900425000022;
+//var myModel                     = "MN47";
+//var mySn                        = 916452000003;
+//var myPlatformUrl               = "https://nextivity-sandbox-connect.axeda.com:443/ammp/";
+var myPlatformUrl           = "https://nextivity-connect.axeda.com:443/ammp/";
 
 var MainLoopIntervalHandle      = null;
 var uMainLoopCounter            = 0;
@@ -109,7 +109,7 @@ function renderView()
     "<tr> <td><br>Get Update True</td>   <td><input type='button' value='Start Test' onclick='getUpdateTrueTest()'></input></td>  <td id='s4'>Not Started</td>  <td class='desc'>Send 'SwVerCU_CF':'700.036.000.000'. <br>Send 'isUpdateAvailable':'false' then 'isUpdateAvailable':'true'.<br>Poll every 2 sec until 'isUpdateAvailable' is sent back, 30 polls max.</td></tr>" +
     "</table> </div>" +
     
-    "<textarea id='textBox_id' rows='40' cols='120'>Axeda Test Log</textarea>";
+    "<textarea id='textBox_id' rows='40' cols='120'>Axeda Test Log (Run with IE, not Chrome)</textarea>";
     
     $('body').html(myHtml); 
                 
@@ -189,9 +189,8 @@ function getUpdateTrueTest()
 {
     PrintLog(2, "Get Update True key pressed." );
     SendCloudAsset();
-//    SendCloudData( "'SwVerCU_CF':'700.036.000.000'" );    
+    SendCloudData( "'SwVerCU_CF':'700.036.000.000'" );    
 //    SendCloudData( "'SwVerCU_CF':'700.036.ede.ded'" );    
-    SendCloudData( "'SwVerCU_CF':'700.036.99.99'" );    
     SendCloudData( "'isUpdateAvailable':'false'" );
     uMainLoopCounter                 = 0;
     bGotUpdateAvailableRspFromCloud  = false;
