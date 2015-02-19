@@ -115,6 +115,7 @@ function renderView()
                 
     document.getElementById('asset_id').innerHTML += "  Model: " + myModel + " SN: " + mySn;
 
+
 }
 
 // User............................................................................................
